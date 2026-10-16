@@ -1,1068 +1,321 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ALLIO | منصة إدارة صفحات الهبوط والذكاء الاصطناعي</title>
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Fonts (Cairo) -->
-  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
-  <!-- React & Babel -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+import React, { useState, useEffect, createContext, useContext } from 'react';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 
-  <!-- Firebase SDK -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-    // البلاصة فين غتحط معلومات فايربيز ديالك:
-    const firebaseConfig = {
-<script type="module">
+const firebaseConfig = {
   // Import the functions you need from the SDKs you need
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/13.0.0/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyDd_4X04yxoUNuGXl43U4f2w8wSEc6QmtQ",
-    authDomain: "allio-769de.firebaseapp.com",
-    projectId: "allio-769de",
-    storageBucket: "allio-769de.firebasestorage.app",
-    messagingSenderId: "538904003838",
-    appId: "1:538904003838:web:ba615d22b339054e9511af",
-    measurementId: "G-537YE2XX7V"
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDd_4X04yxoUNuGXl43U4f2w8wSEc6QmtQ",
+  authDomain: "allio-769de.firebaseapp.com",
+  projectId: "allio-769de",
+  storageBucket: "allio-769de.firebasestorage.app",
+  messagingSenderId: "538904003838",
+  appId: "1:538904003838:web:aae0c0227870c44b9511af",
+  measurementId: "G-T38HBBQTGB"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
+
+  const login = (email, password) => signInWithEmailAndPassword(auth, email, password);
+  const logout = () => signOut(auth);
+
+  if (loading) return <div className="min-h-screen flex items-center justify-center text-white">Loading...</div>;
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+export const useAuth = () => useContext(AuthContext);
+
+export const AdminDashboard = () => {
+  const { logout } = useAuth();
+  const [users, setUsers] = useState([]);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [orders, setOrders] = useState([]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (selectedUser) {
+      const q = query(collection(db, 'orders'), where('userId', '==', selectedUser.id));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+      return unsubscribe;
+    } else {
+      setOrders([]);
+    }
+  }, [selectedUser]);
+
+  const updateOrderStatus = async (orderId, newStatus) => {
+    await updateDoc(doc(db, 'orders', orderId), { status: newStatus });
   };
 
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-</script>
-    };
+  const deleteUser = async (userId) => {
+    await deleteDoc(doc(db, 'users', userId));
+    setSelectedUser(null);
+  };
 
-    // Initialize Firebase
-    const app = initializeApp(firebaseConfig);
-    export const db = getFirestore(app);
-  </script>
-
-  <style>
-    body { font-family: 'Cairo', sans-serif; background-color: #0f172a; color: #f8fafc; }
-    .gradient-brand { background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%); }
-    .glass-card { background: rgba(30, 41, 59, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
-  </style>
-</head>
-<body>
-  <div id="root"></div>
-
-  <script type="text/babel">
-    const { useState, useEffect } = React;
-
-    const INITIAL_PAGES = [
-      {
-        id: 'lp-1',
-        slug: 'cordless-vacuum-pro',
-        title: 'مكنسة كهربائية لاسلكية توربو الذكية 3 في 1',
-        hook: 'تخلصي من الغبار والأوساخ في دقائق بلا خيوط وبلا عذاب! التوصيل فابور اليوم فقط 🔥',
-        price: 349,
-        oldPrice: 550,
-        productCost: 130,
-        shippingCost: 35,
-        adSpend: 450,
-        image: 'https://images.unsplash.com/photo-1558317374-067fb5f30001?auto=format&fit=crop&w=900&q=80',
-        sourceUrl: 'https://www.aliexpress.com/item/100500612345.html',
-        language: 'darija',
-        features: [
-          'قوة شفط عالية جداً كتجمع الغبار والشعر من الزرابي والضس فدقيقة',
-          'بطارية ليثيوم كتشد الشارج مزيان وكتخدم بلا كابليات',
-          'خفيفة فـ اليد وساهلة فـ التنظيف بضغطة زر وحدة',
-          'الدفع عند الاستلام حتى تقلب السلعة ديالك قدام الليفرور'
-        ],
-        reviews: [
-          { name: 'سعاد المراكشية', city: 'فاس', comment: 'الصراحة واعرة بزاف، هناتني من المكنسة القديمة اللي بالكابل والشارج ديالها كيدوم!', stars: 5 },
-          { name: 'ياسين العلمي', city: 'الدار البيضاء', comment: 'وصلاتني فالوقت ونفس اللون والموديل اللي فالصورة طبق الأصل، شكراً ليكم.', stars: 5 }
-        ],
-        stats: { views: 412, scrolled50: 280, clickedBuy: 115, abandoned: 14 }
-      }
-    ];
-
-    const INITIAL_ORDERS = [
-      { id: 'ORD-101', pageId: 'lp-1', fullName: 'أمين التازي', phone: '0661234567', city: 'فاس', address: 'طريق صفرو، إقامة الياسمين الشقة 8', email: 'amine@gmail.com', status: 'delivered', time: 'منذ ساعتين' }
-    ];
-
-    function App() {
-      const [pages, setPages] = useState(() => {
-        const saved = localStorage.getItem('allio_pages');
-        return saved ? JSON.parse(saved) : INITIAL_PAGES;
-      });
-      const [orders, setOrders] = useState(() => {
-        const saved = localStorage.getItem('allio_orders');
-        return saved ? JSON.parse(saved) : INITIAL_ORDERS;
-      });
-      const [abandonedCarts, setAbandonedCarts] = useState(() => {
-        const saved = localStorage.getItem('allio_abandoned');
-        return saved ? JSON.parse(saved) : [
-          { id: 'AB-1', pageId: 'lp-1', fullName: 'محمد', phone: '0699887766', city: 'الرباط', step: 'كتب الرقم والمدينة وخرج قبل التأكيد', time: 'منذ 15 دقيقة' }
-        ];
-      });
-      const [radarLogs, setRadarLogs] = useState([
-        { id: 1, pageTitle: 'مكنسة كهربائية لاسلكية توربو الذكية 3 في 1', action: '👀 زبون من مدينة فاس دخل لصفحة الهبوط', time: 'الآن' }
-      ]);
-
-      const [viewMode, setViewMode] = useState('admin'); 
-      const [activeTab, setActiveTab] = useState('ai-builder'); 
-      const [selectedPageId, setSelectedPageId] = useState(pages[0]?.id || 'lp-1');
-      const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('allio_gemini_key') || '');
-
-      const [aiUrl, setAiUrl] = useState('');
-      const [aiCustomNotes, setAiCustomNotes] = useState('');
-      const [aiSalePrice, setAiSalePrice] = useState(299);
-      const [aiCostPrice, setAiCostPrice] = useState(100);
-      const [aiShippingCost, setAiShippingCost] = useState(35);
-      const [aiLanguage, setAiLanguage] = useState('darija'); 
-      const [aiCustomImage, setAiCustomImage] = useState('');
-      const [isGenerating, setIsGenerating] = useState(false);
-      const [aiStepText, setAiStepText] = useState('');
-      const [generatedPreview, setGeneratedPreview] = useState(null);
-
-      const [customerForm, setCustomerForm] = useState({ fullName: '', phone: '', city: '', address: '', email: '' });
-      const [orderSuccess, setOrderSuccess] = useState(false);
-
-      useEffect(() => { localStorage.setItem('allio_pages', JSON.stringify(pages)); }, [pages]);
-      useEffect(() => { localStorage.setItem('allio_orders', JSON.stringify(orders)); }, [orders]);
-      useEffect(() => { localStorage.setItem('allio_abandoned', JSON.stringify(abandonedCarts)); }, [abandonedCarts]);
-      useEffect(() => { localStorage.setItem('allio_gemini_key', geminiApiKey); }, [geminiApiKey]);
-
-      const currentPage = pages.find(p => p.id === selectedPageId) || pages[0];
-
-      const logRadarEvent = (pageId, actionText) => {
-        const pageObj = pages.find(p => p.id === pageId);
-        setRadarLogs(prev => [
-          { id: Date.now(), pageTitle: pageObj ? pageObj.title : 'صفحة هبوط', action: actionText, time: 'الآن' },
-          ...prev.slice(0, 29)
-        ]);
-      };
-
-      const handleGenerateFromUrl = async (e) => {
-        e.preventDefault();
-        if (!aiUrl.trim() && !aiCustomNotes.trim()) {
-          alert('عافاك حط الرابط ديال AliExpress أو Amazon أو كتب اسم المنتج!');
-          return;
-        }
-
-        setIsGenerating(true);
-        setGeneratedPreview(null);
-
-        try {
-          let scrapedContent = '';
-          if (aiUrl.trim()) {
-            setAiStepText('1/3 🔍 جاري الدخول للرابط وسحب معلومات المنتج والتصاور عبر Jina Reader...');
-            try {
-              const jinaRes = await fetch(`https://r.jina.ai/${encodeURIComponent(aiUrl.trim())}`);
-              if (jinaRes.ok) {
-                const rawText = await jinaRes.text();
-                scrapedContent = rawText.substring(0, 4500);
-              }
-            } catch (err) {
-              console.warn('Jina fallback to smart AI analysis');
-            }
-          }
-
-          setAiStepText('2/3 🧠 الذكاء الاصطناعي ديال ALLIO كيلخص المميزات وكيكتب صفحة الهبوط بطريقة تسويقية...');
-
-          let aiData = null;
-
-          if (geminiApiKey.trim()) {
-            const langInstruction = aiLanguage === 'darija'
-              ? 'اكتب بالدارجة المغربية التسويقية المقنعة جداً (لغة الإعلانات في المغرب COD).'
-              : 'اكتب باللغة العربية الفصحى التسويقية الجذابة والمقنعة.';
-
-            const promptText = `
-أنت خبير تسويق وتجارة إلكترونية (COD) في منصة ALLIO.
-قم بتحويل بيانات هذا المنتج من الرابط (${aiUrl}) والملاحظات (${aiCustomNotes}) والنص المسحوب (${scrapedContent}) إلى صفحة هبوط عالية التحويل.
-${langInstruction}
-أرجع النتيجة بصيغة JSON فقط بدون أي نص إضافي بهذا الشكل:
-{
-  "title": "عنوان المنتج الجذاب",
-  "hook": "جملة خطافة قوية في الأعلى تشجع على الشراء فوراً مع التوصيل المجاني",
-  "features": ["ميزة 1", "ميزة 2", "ميزة 3", "ميزة 4"],
-  "reviews": [
-    {"name": "اسم مغربي 1", "city": "مدينة مغربية", "comment": "تعليق إيجابي مقنع", "stars": 5},
-    {"name": "اسم مغربي 2", "city": "مدينة مغربية", "comment": "تعليق إيجابي مقنع", "stars": 5}
-  ]
-}`;
-
-            const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey.trim()}`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: promptText }] }]
-              })
-            });
-
-            if (geminiRes.ok) {
-              const geminiJson = await geminiRes.json();
-              const rawReply = geminiJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
-              if (jsonMatch) {
-                aiData = JSON.parse(jsonMatch[0]);
-              }
-            }
-          }
-
-          if (!aiData) {
-            await new Promise(r => setTimeout(r, 1400));
-            const cleanHint = aiCustomNotes.trim() || aiUrl.split('/').pop().replace(/[-_.html]/g, ' ').substring(0, 40) || 'منتج ذكي أصلي عالي الجودة';
-            if (aiLanguage === 'darija') {
-              aiData = {
-                title: `${cleanHint} - النسخة الأصلية الاحترافية`,
-                hook: `الحل النهائي اللي غيهنيك ويوفر عليك الوقت والمجهود! اطلب اليوم واستفد من تخفيض حصري + التوصيل حتى لباب الدار 🚚🔥`,
-                features: [
-                  'جودة عالية ومصنوع من مواد متينة كتعيش معاك مدة طويلة',
-                  'سهل فـ الاستعمال وعملي بزاف فـ الدار أو الخدمة',
-                  'تصميم عصري وأنيق طبق الأصل للصورة والفيديو',
-                  'ضمان الجودة + الدفع عند الاستلام حتى تشوف السلعة ديالك'
-                ],
-                reviews: [
-                  { name: 'حمزة الفاسي', city: 'فاس', comment: 'تبارك الله سلعة نقية بزاف، وصلني فـ 24 ساعة ونفس الموديل اللي فالصورة بالضبط!', stars: 5 },
-                  { name: 'مريم بناني', city: 'مراكش', comment: 'جربتو هادي سيمانة وصدقات واعرة بزاف، كنصح بيها أي واحد كيتردد.', stars: 5 }
-                ]
-              };
-            } else {
-              aiData = {
-                title: `${cleanHint} - الإصدار الاحترافي الأصلي`,
-                hook: `احصل على أفضل تجربة وأداء فائق مع ضمان الجودة الشامل! عرض حصري لفترة محدودة مع الدفع عند الاستلام 🚚✨`,
-                features: [
-                  'تصميم هندسي متطور يضمن لك أعلى كفاءة وأداء يومي ممتاز',
-                  'خامات أصلية مقاومة للاستخدام المكثف وتدوم طويلاً',
-                  'سهل الاستخدام والتنظيف ومناسب لجميع أفراد العائلة',
-                  'الدفع بأمان عند الاستلام بعد معاينة المنتج'
-                ],
-                reviews: [
-                  { name: 'عمر المنصوري', city: 'الرباط', comment: 'منتج ممتاز جداً ومطابق للمواصفات المذكورة، التوصيل كان سريعاً والتعامل راقي.', stars: 5 },
-                  { name: 'نهيلة العلوي', city: 'طنجة', comment: 'جودة رائعة تستحق الثمن، شكراً لمتجر ALLIO على المصداقية.', stars: 5 }
-                ]
-              };
-            }
-          }
-
-          setAiStepText('3/3 🎨 جاري تصميم صفحة الهبوط وربطها مع الفورم والحاسبة المالية...');
-          await new Promise(r => setTimeout(r, 700));
-
-          const newPageObj = {
-            id: 'lp-' + Date.now(),
-            slug: 'product-' + Math.floor(Math.random() * 9000 + 1000),
-            title: aiData.title,
-            hook: aiData.hook,
-            price: Number(aiSalePrice) || 299,
-            oldPrice: Math.round((Number(aiSalePrice) || 299) * 1.45),
-            productCost: Number(aiCostPrice) || 100,
-            shippingCost: Number(aiShippingCost) || 35,
-            adSpend: 0,
-            image: aiCustomImage.trim() || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=900&q=80',
-            sourceUrl: aiUrl.trim() || 'Direct AI Generation',
-            language: aiLanguage,
-            features: aiData.features,
-            reviews: aiData.reviews,
-            stats: { views: 1, scrolled50: 0, clickedBuy: 0, abandoned: 0 }
-          };
-
-          setGeneratedPreview(newPageObj);
-        } catch (error) {
-          alert('وقع خطأ بسيط فـ التوليد، عاود جرب!');
-        } finally {
-          setIsGenerating(false);
-          setAiStepText('');
-        }
-      };
-
-      const publishGeneratedPage = () => {
-        if (!generatedPreview) return;
-        setPages(prev => [generatedPreview, ...prev]);
-        setSelectedPageId(generatedPreview.id);
-        setGeneratedPreview(null);
-        setAiUrl('');
-        setAiCustomNotes('');
-        alert('✅ مبروك! تم نشر صفحة الهبوط فـ منصة ALLIO وراها واجدة تستقبل الطلبيات!');
-        setActiveTab('pages');
-      };
-
-      const exportProductCSV = (pageId) => {
-        const targetPage = pages.find(p => p.id === pageId);
-        const pageOrders = orders.filter(o => o.pageId === pageId);
-        if (pageOrders.length === 0) {
-          alert('مازال ما كاينا حتى طلبية فـ هاد المنتج باش تيليشارجيها.');
-          return;
-        }
-        const headers = ['رقم الطلبية', 'الاسم والنسب', 'رقم الهاتف', 'المدينة', 'العنوان الكامل', 'الإيميل (اختياري)', 'الحالة', 'المنتج', 'الثمن (DH)'];
-        const rows = pageOrders.map(o => [
-          o.id,
-          `"${o.fullName}"`,
-          `"${o.phone}"`,
-          `"${o.city}"`,
-          `"${o.address}"`,
-          `"${o.email || 'غير متوفر'}"`,
-          o.status,
-          `"${targetPage?.title || ''}"`,
-          targetPage?.price || 0
-        ]);
-        const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', `ALLIO_Clients_${targetPage?.slug || 'product'}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      };
-
-      const handleCustomerOrderSubmit = (e) => {
-        e.preventDefault();
-        if (!customerForm.fullName || !customerForm.phone || !customerForm.city || !customerForm.address) {
-          alert('عافاك عمر المعلومات الضرورية (الاسم الكامل، رقم الهاتف، المدينة، والعنوان الكامل)!');
-          return;
-        }
-        const newOrd = {
-          id: 'ORD-' + Math.floor(100 + Math.random() * 900),
-          pageId: currentPage.id,
-          fullName: customerForm.fullName,
-          phone: customerForm.phone,
-          city: customerForm.city,
-          address: customerForm.address,
-          email: customerForm.email || '',
-          status: 'confirmed',
-          time: 'الآن'
-        };
-        setOrders(prev => [newOrd, ...prev]);
-        setPages(prev => prev.map(p => p.id === currentPage.id ? { ...p, stats: { ...p.stats, clickedBuy: p.stats.clickedBuy + 1 } } : p));
-        logRadarEvent(currentPage.id, `🎉 طلبية جديدة تسجلات! الزبون "${customerForm.fullName}" من "${customerForm.city}" شرى المنتج بـ ${currentPage.price} درهم`);
-        setOrderSuccess(true);
-        setCustomerForm({ fullName: '', phone: '', city: '', address: '', email: '' });
-      };
-
-      const handlePhoneBlur = () => {
-        if (customerForm.phone.length >= 8 && !orderSuccess) {
-          const exists = abandonedCarts.some(a => a.phone === customerForm.phone && a.pageId === currentPage.id);
-          if (!exists) {
-            setAbandonedCarts(prev => [{
-              id: 'AB-' + Date.now(),
-              pageId: currentPage.id,
-              fullName: customerForm.fullName || 'زبون غير مكتمل',
-              phone: customerForm.phone,
-              city: customerForm.city || 'غير محددة',
-              step: 'كتب الرقم والمدينة وخرج قبل التأكيد',
-              time: 'الآن'
-            }, ...prev]);
-            logRadarEvent(currentPage.id, `⚠️ الزبون كتب رقم الهاتف (${customerForm.phone}) فـ الفورم (تم حفظه فـ السلات المتروكة)`);
-          }
-        }
-      };
-
-      const calculateFinancials = (page) => {
-        const pageOrders = orders.filter(o => o.pageId === page.id);
-        const deliveredOrders = pageOrders.filter(o => o.status === 'delivered' || o.status === 'confirmed');
-        const count = deliveredOrders.length;
-        const revenue = count * Number(page.price);
-        const totalProductCost = count * Number(page.productCost);
-        const totalShippingCost = count * Number(page.shippingCost);
-        const totalAds = Number(page.adSpend || 0);
-        const netProfit = revenue - (totalProductCost + totalShippingCost + totalAds);
-        return { count, totalOrders: pageOrders.length, revenue, totalProductCost, totalShippingCost, totalAds, netProfit };
-      };
-
-      const globalStats = pages.reduce((acc, p) => {
-        const f = calculateFinancials(p);
-        acc.revenue += f.revenue;
-        acc.netProfit += f.netProfit;
-        acc.orders += f.totalOrders;
-        acc.views += p.stats.views;
-        return acc;
-      }, { revenue: 0, netProfit: 0, orders: 0, views: 0 });
-
-      return (
-        <div className="min-h-screen flex flex-col">
-          <header className="bg-slate-900/95 border-b border-slate-800 px-4 py-3 sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl gradient-brand flex items-center justify-center shadow-lg shadow-indigo-500/30 font-black text-xl tracking-wider text-white">
-                A
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-black text-xl tracking-widest text-white">ALLIO</span>
-                  <span className="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-full font-semibold">
-                    AI Multi-Store OS
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400">نظام إدارة صفحات الهبوط، استيراد المنتجات بالـ AI، والحاسبة المالية</p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 bg-slate-800/90 p-1.5 rounded-xl border border-slate-700">
-              <button
-                onClick={() => { setViewMode('admin'); setOrderSuccess(false); }}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                  viewMode === 'admin' ? 'gradient-brand text-white shadow-md' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                🛠️ لوحة تحكم ALLIO
-              </button>
-              <button
-                onClick={() => {
-                  setViewMode('live-store');
-                  setOrderSuccess(false);
-                  setPages(prev => prev.map(p => p.id === currentPage.id ? { ...p, stats: { ...p.stats, views: p.stats.views + 1 } } : p));
-                  logRadarEvent(currentPage.id, '👀 زبون جديد دخل يعاين صفحة الهبوط مباشرة');
-                }}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-                  viewMode === 'live-store' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                🌐 معاينة صفحة الهبوط (كزبون حي)
-              </button>
-            </div>
-          </header>
-
-          {viewMode === 'admin' ? (
-            <div className="flex-1 flex flex-col lg:flex-row">
-              <aside className="w-full lg:w-64 bg-slate-900/60 border-b lg:border-b-0 lg:border-l border-slate-800 p-4 flex lg:flex-col gap-2 overflow-x-auto">
-                {[
-                  { id: 'ai-builder', label: '🤖 استيراد وتوليد بـ AI', badge: 'جديد' },
-                  { id: 'overview', label: '📊 النظرة العامة' },
-                  { id: 'pages', label: '🚀 صفحات الهبوط (' + pages.length + ')' },
-                  { id: 'datasheets', label: '📁 ملفات الداتا والعملاء' },
-                  { id: 'finance', label: '💰 الحاسبة المالية والربح' },
-                  { id: 'radar', label: '🕵️‍♂️ رادار تتبع الزوار' },
-                  { id: 'settings', label: '⚙️ ربط Gemini & Firebase' }
-                ].map(tab => (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${
-                      activeTab === tab.id
-                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
-                        : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200'
-                    }`}
-                  >
-                    <span>{tab.label}</span>
-                    {tab.badge && (
-                      <span className="text-[10px] bg-pink-500 text-white px-2 py-0.5 rounded-full font-extrabold mr-2">
-                        {tab.badge}
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </aside>
-
-              <main className="flex-1 p-4 md:p-6 overflow-y-auto space-y-6">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="glass-card p-4 rounded-2xl">
-                    <p className="text-xs text-slate-400">إجمالي المبيعات (Chiffre d'affaires)</p>
-                    <p className="text-2xl font-black text-white mt-1">{globalStats.revenue.toLocaleString()} <span className="text-sm text-indigo-400">DH</span></p>
-                  </div>
-                  <div className="glass-card p-4 rounded-2xl border-emerald-500/30">
-                    <p className="text-xs text-emerald-400 font-bold">الربح الصافي (بعد السلعة والتوصيل والإعلان)</p>
-                    <p className="text-2xl font-black text-emerald-400 mt-1">{globalStats.netProfit.toLocaleString()} <span className="text-sm">DH</span></p>
-                  </div>
-                  <div className="glass-card p-4 rounded-2xl">
-                    <p className="text-xs text-slate-400">مجموع الطلبيات المسجلة</p>
-                    <p className="text-2xl font-black text-white mt-1">{globalStats.orders} <span className="text-sm text-slate-400">طلبية</span></p>
-                  </div>
-                  <div className="glass-card p-4 rounded-2xl">
-                    <p className="text-xs text-slate-400">زوار صفحات الهبوط (Live Views)</p>
-                    <p className="text-2xl font-black text-amber-400 mt-1">{globalStats.views} <span className="text-sm text-slate-400">زائر</span></p>
-                  </div>
-                </div>
-
-                {activeTab === 'ai-builder' && (
-                  <div className="space-y-6">
-                    <div className="glass-card p-6 rounded-2xl border-indigo-500/40">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                        <div>
-                          <h2 className="text-xl font-black text-white flex items-center gap-2">
-                            <span>🤖 مُنشئ صفحات الهبوط بالذكاء الاصطناعي (ALLIO AI Scraper)</span>
-                          </h2>
-                          <p className="text-sm text-slate-300 mt-1">
-                            حط غير الرابط ديال المنتج من <strong className="text-amber-400">AliExpress</strong> أو <strong className="text-amber-400">Amazon</strong>، والـ AI غادي يجبد المعلومات، يلخصهم، ويصاوب لك صفحة هبوط واجدة للبيع!
-                          </p>
-                        </div>
-                      </div>
-
-                      <form onSubmit={handleGenerateFromUrl} className="space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="md:col-span-2">
-                            <label className="block text-xs font-bold text-slate-300 mb-2">
-                              🔗 رابط المنتج (AliExpress / Amazon / أو أي متجر منافس):
-                            </label>
-                            <input
-                              type="url"
-                              value={aiUrl}
-                              onChange={e => setAiUrl(e.target.value)}
-                              placeholder="https://www.aliexpress.com/item/100500..."
-                              className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 focus:outline-none"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-bold text-slate-300 mb-2">
-                              📝 اسم المنتج أو ملاحظات إضافية للـ AI (اختياري ولكن كيعاون بزاف):
-                            </label>
-                            <input
-                              type="text"
-                              value={aiCustomNotes}
-                              onChange={e => setAiCustomNotes(e.target.value)}
-                              placeholder="مثلاً: خلاط كهربائي محمول كيتشارجا بـ USB..."
-                              className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 focus:outline-none"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-bold text-slate-300 mb-2">
-                              🖼️ رابط صورة المنتج (طبق الأصل) - أو خليه للـ AI:
-                            </label>
-                            <input
-                              type="url"
-                              value={aiCustomImage}
-                              onChange={e => setAiCustomImage(e.target.value)}
-                              placeholder="https://..."
-                              className="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:border-indigo-500 focus:outline-none"
-                            />
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-2">
-                          <div>
-                            <label className="block text-xs font-bold text-slate-300 mb-1">ثمن البيع للزبون (DH)</label>
-                            <input
-                              type="number"
-                              value={aiSalePrice}
-                              onChange={e => setAiSalePrice(e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-bold text-emerald-400"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-300 mb-1">تكلفة المنتج عليك (DH)</label>
-                            <input
-                              type="number"
-                              value={aiCostPrice}
-                              onChange={e => setAiCostPrice(e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-bold text-rose-400"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-300 mb-1">تكلفة التوصيل (DH)</label>
-                            <input
-                              type="number"
-                              value={aiShippingCost}
-                              onChange={e => setAiShippingCost(e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-bold text-amber-400"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-300 mb-1">لغة صفحة الهبوط</label>
-                            <select
-                              value={aiLanguage}
-                              onChange={e => setAiLanguage(e.target.value)}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-sm font-bold text-white"
-                            >
-                              <option value="darija">🇲🇦 الدارجة المغربية التسويقية</option>
-                              <option value="arabic">🇸🇦 العربية الفصحى</option>
-                            </select>
-                          </div>
-                        </div>
-
-                        <button
-                          type="submit"
-                          disabled={isGenerating}
-                          className="w-full py-4 rounded-xl gradient-brand text-white font-black text-base shadow-xl shadow-indigo-500/25 hover:opacity-95 transition-all"
-                        >
-                          {isGenerating ? aiStepText : '✨ جبد المعلومات من الرابط وصاوب لي صفحة الهبوط دابا!'}
-                        </button>
-                      </form>
-                    </div>
-
-                    {generatedPreview && (
-                      <div className="glass-card p-6 rounded-2xl border-2 border-emerald-500/60 space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-700 pb-4">
-                          <div>
-                            <span className="text-xs bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full font-bold">
-                              ✅ واجدة للنشر!
-                            </span>
-                            <h3 className="text-lg font-black text-white mt-2">{generatedPreview.title}</h3>
-                          </div>
-                          <div className="flex gap-3">
-                            <button
-                              onClick={publishGeneratedPage}
-                              className="px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm shadow-lg"
-                            >
-                              🚀 اعتمد وانشر صفحة الهبوط فـ ALLIO
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-3">
-                            <label className="block text-xs text-slate-400">تعديل العنوان (إلا بغيتي تبدل فيه شي كلمة):</label>
-                            <input
-                              type="text"
-                              value={generatedPreview.title}
-                              onChange={e => setGeneratedPreview({ ...generatedPreview, title: e.target.value })}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-bold"
-                            />
-                            <label className="block text-xs text-slate-400">العنوان الخطاف (Hook):</label>
-                            <textarea
-                              rows="2"
-                              value={generatedPreview.hook}
-                              onChange={e => setGeneratedPreview({ ...generatedPreview, hook: e.target.value })}
-                              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-amber-300"
-                            />
-                            <p className="text-xs font-bold text-slate-300">المميزات اللي لخص الـ AI:</p>
-                            <ul className="space-y-1.5 text-sm text-slate-200">
-                              {generatedPreview.features.map((f, i) => (
-                                <li key={i} className="bg-slate-900/60 px-3 py-2 rounded-lg border border-slate-800">✅ {f}</li>
-                              ))}
-                            </ul>
-                          </div>
-                          <div className="flex flex-col items-center justify-center bg-slate-900/60 rounded-xl p-4 border border-slate-800">
-                            <img src={generatedPreview.image} alt="Preview" className="w-56 h-56 object-cover rounded-xl mb-3" />
-                            <p className="text-lg font-black text-emerald-400">{generatedPreview.price} درهم <span className="line-through text-xs text-slate-500">{generatedPreview.oldPrice} DH</span></p>
-                            <p className="text-xs text-slate-400 mt-1">الربح الصافي المتوقع فكل حبة: <strong className="text-white">{generatedPreview.price - generatedPreview.productCost - generatedPreview.shippingCost} DH</strong></p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {(activeTab === 'pages' || activeTab === 'overview') && (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h2 className="text-lg font-black text-white">🚀 صفحات الهبوط النشطة فـ ALLIO</h2>
-                      <button
-                        onClick={() => setActiveTab('ai-builder')}
-                        className="px-4 py-2 rounded-xl gradient-brand text-white text-xs font-bold"
-                      >
-                        + إضافة صفحة هبوط جديدة بالـ AI
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {pages.map(page => {
-                        const fin = calculateFinancials(page);
-                        const convRate = page.stats.views > 0 ? ((fin.totalOrders / page.stats.views) * 100).toFixed(1) : 0;
-                        return (
-                          <div key={page.id} className="glass-card p-5 rounded-2xl flex flex-col justify-between gap-4 border hover:border-indigo-500/50 transition-all">
-                            <div className="flex gap-4">
-                              <img src={page.image} alt={page.title} className="w-24 h-24 rounded-xl object-cover border border-slate-700" />
-                              <div className="flex-1">
-                                <span className="text-[11px] bg-indigo-500/20 text-indigo-300 px-2.5 py-0.5 rounded-full font-bold">
-                                  allio.store/{page.slug}
-                                </span>
-                                <h3 className="font-bold text-base text-white mt-1">{page.title}</h3>
-                                <div className="flex flex-wrap gap-3 mt-2 text-xs">
-                                  <span className="text-emerald-400 font-bold">الثمن: {page.price} DH</span>
-                                  <span className="text-slate-400">السلعة: {page.productCost} DH</span>
-                                  <span className="text-slate-400">التوصيل: {page.shippingCost} DH</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-4 gap-2 bg-slate-900/80 p-3 rounded-xl text-center border border-slate-800">
-                              <div>
-                                <p className="text-[11px] text-slate-400">الزوار</p>
-                                <p className="font-black text-sm text-white">{page.stats.views}</p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] text-slate-400">الطلبيات</p>
-                                <p className="font-black text-sm text-indigo-400">{fin.totalOrders}</p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] text-slate-400">نسبة التحويل</p>
-                                <p className="font-black text-sm text-amber-400">{convRate}%</p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] text-slate-400">الربح الصافي</p>
-                                <p className="font-black text-sm text-emerald-400">{fin.netProfit} DH</p>
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                onClick={() => {
-                                  setSelectedPageId(page.id);
-                                  setViewMode('live-store');
-                                }}
-                                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold"
-                              >
-                                👁️ فتح ومعاينة الصفحة
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setSelectedPageId(page.id);
-                                  setActiveTab('datasheets');
-                                }}
-                                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700"
-                              >
-                                📁 ملف الداتا ({fin.totalOrders})
-                              </button>
-                              <button
-                                onClick={() => exportProductCSV(page.id)}
-                                className="px-3 py-2.5 rounded-xl bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 text-xs font-bold hover:bg-indigo-600 hover:text-white"
-                              >
-                                📥 Excel
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'datasheets' && (
-                  <div className="space-y-6">
-                    <div className="glass-card p-5 rounded-2xl space-y-4">
-                      <div className="flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                          <h2 className="text-lg font-black text-white">📁 ملفات داتا الزبناء (معزولة لكل منتج بوحدو)</h2>
-                          <p className="text-xs text-slate-400">اختار المنتج باش تشوف جميع العملاء اللي شراوه وتيليشارجي الملف ديالو</p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <select
-                            value={selectedPageId}
-                            onChange={e => setSelectedPageId(e.target.value)}
-                            className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm font-bold text-white"
-                          >
-                            {pages.map(p => (
-                              <option key={p.id} value={p.id}>📦 {p.title}</option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={() => exportProductCSV(selectedPageId)}
-                            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black shadow-lg"
-                          >
-                            📥 تحميل ملف Excel (CSV) لهاد المنتج
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-right text-sm border-collapse">
-                          <thead>
-                            <tr className="border-b border-slate-800 text-slate-400 text-xs">
-                              <th className="py-3 px-3">رقم الطلب</th>
-                              <th className="py-3 px-3">الاسم والنسب *</th>
-                              <th className="py-3 px-3">رقم الهاتف *</th>
-                              <th className="py-3 px-3">المدينة *</th>
-                              <th className="py-3 px-3">العنوان الكامل *</th>
-                              <th className="py-3 px-3">الإيميل (اختياري)</th>
-                              <th className="py-3 px-3">الحالة</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-800/60">
-                            {orders.filter(o => o.pageId === selectedPageId).map(ord => (
-                              <tr key={ord.id} className="hover:bg-slate-800/40">
-                                <td className="py-3 px-3 font-bold text-indigo-400">{ord.id}</td>
-                                <td className="py-3 px-3 font-bold text-white">{ord.fullName}</td>
-                                <td className="py-3 px-3">
-                                  <a
-                                    href={`https://wa.me/212${ord.phone.replace(/^0/, '')}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="text-emerald-400 font-bold hover:underline flex items-center gap-1"
-                                  >
-                                    <span>📱 {ord.phone}</span>
-                                  </a>
-                                </td>
-                                <td className="py-3 px-3 text-slate-200">{ord.city}</td>
-                                <td className="py-3 px-3 text-slate-300">{ord.address}</td>
-                                <td className="py-3 px-3 text-slate-400 text-xs">{ord.email || '—'}</td>
-                                <td className="py-3 px-3">
-                                  <select
-                                    value={ord.status}
-                                    onChange={e => setOrders(prev => prev.map(item => item.id === ord.id ? { ...item, status: e.target.value } : item))}
-                                    className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-emerald-400"
-                                  >
-                                    <option value="confirmed">مؤكدة ✅</option>
-                                    <option value="delivered">تم التوصيل 🚚</option>
-                                    <option value="returned">روتور / ملغية ❌</option>
-                                  </select>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-
-                    <div className="glass-card p-5 rounded-2xl border border-amber-500/30">
-                      <h3 className="text-sm font-black text-amber-400 mb-3">⚠️ السلات المتروكة (الناس اللي كتبو رقمهم وما كملوش الطلب)</h3>
-                      <div className="space-y-2">
-                        {abandonedCarts.map(ab => (
-                          <div key={ab.id} className="flex flex-wrap items-center justify-between bg-slate-900/70 p-3 rounded-xl text-xs">
-                            <span>👤 <strong>{ab.fullName}</strong> — 📞 <strong className="text-emerald-400">{ab.phone}</strong> ({ab.city})</span>
-                            <span className="text-amber-300">{ab.step}</span>
-                            <span className="text-slate-500">{ab.time}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'finance' && (
-                  <div className="glass-card p-6 rounded-2xl space-y-4">
-                    <h2 className="text-lg font-black text-white">💰 الحاسبة المالية التلقائية (تقدر تعدل الأثمنة والتكاليف مباشرة)</h2>
-                    <p className="text-xs text-slate-400">
-                      السيستيم كيجمع المبيعات وكينقص منهم (ثمن السلعة + ثمن التوصيل + مصاريف الإعلانات) باش يعطيك الربح الصافي الحقيقي لكل منتج:
-                    </p>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-right text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-800 text-xs text-slate-400">
-                            <th className="py-3 px-2">المنتج</th>
-                            <th className="py-3 px-2">الطلبيات المؤكدة</th>
-                            <th className="py-3 px-2">ثمن البيع (DH)</th>
-                            <th className="py-3 px-2">تكلفة السلعة (DH)</th>
-                            <th className="py-3 px-2">تكلفة التوصيل (DH)</th>
-                            <th className="py-3 px-2">مصاريف Ads (DH)</th>
-                            <th className="py-3 px-2 text-emerald-400">الربح الصافي</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-800">
-                          {pages.map(p => {
-                            const f = calculateFinancials(p);
-                            return (
-                              <tr key={p.id}>
-                                <td className="py-3 px-2 font-bold text-white">{p.title}</td>
-                                <td className="py-3 px-2 font-bold text-indigo-400">{f.count}</td>
-                                <td className="py-3 px-2">
-                                  <input
-                                    type="number"
-                                    value={p.price}
-                                    onChange={e => setPages(prev => prev.map(item => item.id === p.id ? { ...item, price: Number(e.target.value) } : item))}
-                                    className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-white font-bold"
-                                  />
-                                </td>
-                                <td className="py-3 px-2">
-                                  <input
-                                    type="number"
-                                    value={p.productCost}
-                                    onChange={e => setPages(prev => prev.map(item => item.id === p.id ? { ...item, productCost: Number(e.target.value) } : item))}
-                                    className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-rose-400 font-bold"
-                                  />
-                                </td>
-                                <td className="py-3 px-2">
-                                  <input
-                                    type="number"
-                                    value={p.shippingCost}
-                                    onChange={e => setPages(prev => prev.map(item => item.id === p.id ? { ...item, shippingCost: Number(e.target.value) } : item))}
-                                    className="w-20 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-amber-400 font-bold"
-                                  />
-                                </td>
-                                <td className="py-3 px-2">
-                                  <input
-                                    type="number"
-                                    value={p.adSpend}
-                                    onChange={e => setPages(prev => prev.map(item => item.id === p.id ? { ...item, adSpend: Number(e.target.value) } : item))}
-                                    className="w-24 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-purple-400 font-bold"
-                                  />
-                                </td>
-                                <td className="py-3 px-2 font-black text-base text-emerald-400">{f.netProfit.toLocaleString()} DH</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'radar' && (
-                  <div className="glass-card p-6 rounded-2xl space-y-4">
-                    <h2 className="text-lg font-black text-white">🕵️‍♂️ رادار ALLIO لتتبع تحركات الزوار مباشرة</h2>
-                    <p className="text-xs text-slate-400">هنا كيبان لك كل زبون دخل لصفحات الهبوط ديالك، شحال هبط فـ الصفحة، وفوقاش كليكا على الشراء:</p>
-                    <div className="space-y-2">
-                      {radarLogs.map(log => (
-                        <div key={log.id} className="bg-slate-900/80 border border-slate-800 p-3 rounded-xl flex items-center justify-between text-xs">
-                          <div>
-                            <span className="text-indigo-400 font-bold ml-2">[{log.pageTitle}]</span>
-                            <span className="text-slate-200">{log.action}</span>
-                          </div>
-                          <span className="text-slate-500">{log.time}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'settings' && (
-                  <div className="glass-card p-6 rounded-2xl space-y-4 max-w-2xl">
-                    <h2 className="text-lg font-black text-white">⚙️ إعدادات الذكاء الاصطناعي (Gemini API Key)</h2>
-                    <p className="text-xs text-slate-300 leading-relaxed">
-                      المنصة خدامة دابا بمحرك ذكي مدمج، وإلا بغيتي تربطها مباشرة بـ <strong>Google Gemini API المجاني</strong> باش تولي تكتب ليك نصوص مخصصة بعمق أكثر من أي رابط:
-                    </p>
-                    <input
-                      type="password"
-                      value={geminiApiKey}
-                      onChange={e => setGeminiApiKey(e.target.value)}
-                      placeholder="AIzaSyYourGeminiApiKeyHere..."
-                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white"
-                    />
-                    <p className="text-xs text-emerald-400">✅ كيتحفظ المفتاح أوتوماتيكياً فـ المتصفح ديالك.</p>
-                  </div>
-                )}
-              </main>
-            </div>
-          ) : (
-            <div className="flex-1 bg-slate-100 text-slate-900 pb-20">
-              <div className="bg-indigo-950 text-white px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-2">
-                <span>👀 راك دابا فـ وضع معاينة الزبون لصفحة: <strong>{currentPage.title}</strong></span>
-                <select
-                  value={selectedPageId}
-                  onChange={e => { setSelectedPageId(e.target.value); setOrderSuccess(false); }}
-                  className="bg-slate-900 text-white px-3 py-1 rounded border border-indigo-500 font-bold"
-                >
-                  {pages.map(p => (
-                    <option key={p.id} value={p.id}>تبديل المعاينة لـ: {p.title}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="bg-amber-400 text-slate-950 text-center py-2 px-3 font-extrabold text-sm">
-                {currentPage.hook}
-              </div>
-
-              <div className="max-w-4xl mx-auto p-4 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-8 mt-4 bg-white rounded-3xl shadow-xl">
-                <div className="space-y-5">
-                  <img
-                    src={currentPage.image}
-                    alt={currentPage.title}
-                    onClick={() => logRadarEvent(currentPage.id, '🖼️ الزبون كليكا على صورة المنتج باش يكبرها')}
-                    className="w-full h-80 object-cover rounded-2xl shadow-md border border-slate-200 cursor-pointer"
-                  />
-                  <h1 className="text-2xl font-black text-slate-900 leading-snug">{currentPage.title}</h1>
-                  <div className="flex items-center gap-4">
-                    <span className="text-3xl font-black text-emerald-600">{currentPage.price} درهم</span>
-                    <span className="text-lg text-slate-400 line-through font-bold">{currentPage.oldPrice} درهم</span>
-                    <span className="bg-rose-100 text-rose-700 text-xs font-black px-3 py-1 rounded-full">تخفيض خاص اليوم!</span>
-                  </div>
-
-                  <div className="space-y-2.5 bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                    <h3 className="font-black text-sm text-slate-800">✨ علاش هاد المنتج هو أحسن اختيار ليك؟</h3>
-                    {currentPage.features.map((feat, idx) => (
-                      <div key={idx} className="flex items-start gap-2 text-sm text-slate-700 font-semibold">
-                        <span className="text-emerald-600">✔</span>
-                        <span>{feat}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 p-6 rounded-2xl border-2 border-indigo-600 shadow-lg self-start">
-                  <h2 className="text-lg font-black text-center text-slate-900 mb-1">
-                    📦 عمر معلوماتك باش توصلك الطلبية حتى لباب الدار
-                  </h2>
-                  <p className="text-xs text-center text-emerald-700 font-bold mb-5">
-                    الدفع عند الاستلام (ما تخلص حتى تشد السلعة فـ يديك)
-                  </p>
-
-                  {orderSuccess ? (
-                    <div className="bg-emerald-100 border border-emerald-400 text-emerald-900 p-6 rounded-2xl text-center space-y-3">
-                      <p className="text-3xl">🎉</p>
-                      <h3 className="font-black text-lg">تم تسجيل الطلبية ديالك بنجاح!</h3>
-                      <p className="text-xs">غادي نتصلو بيك قريباً فـ التيليفون باش نأكدو معاك العنوان. (ارجع دابا للوحة التحكم غتلقى الطلبية والربح تسجلو أوتوماتيكياً!)</p>
-                      <button
-                        onClick={() => setOrderSuccess(false)}
-                        className="px-4 py-2 rounded-xl bg-emerald-700 text-white text-xs font-bold"
-                      >
-                        إرسال طلبية تجريبية أخرى
-                      </button>
-                    </div>
-                  ) : (
-                    <form onSubmit={handleCustomerOrderSubmit} className="space-y-3.5">
-                      <div>
-                        <label className="block text-xs font-black text-slate-700 mb-1">الاسم الكامل (الاسم والنسب) <span className="text-rose-600">*</span></label>
-                        <input
-                          type="text"
-                          required
-                          value={customerForm.fullName}
-                          onChange={e => setCustomerForm({ ...customerForm, fullName: e.target.value })}
-                          placeholder="أدخل اسمك الكامل هنا..."
-                          className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-3 text-sm focus:border-indigo-600 focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black text-slate-700 mb-1">رقم الهاتف <span className="text-rose-600">*</span></label>
-                        <input
-                          type="tel"
-                          required
-                          value={customerForm.phone}
-                          onBlur={handlePhoneBlur}
-                          onChange={e => setCustomerForm({ ...customerForm, phone: e.target.value })}
-                          placeholder="06XXXXXXXX / 07XXXXXXXX"
-                          className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-3 text-sm focus:border-indigo-600 focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black text-slate-700 mb-1">المدينة <span className="text-rose-600">*</span></label>
-                        <input
-                          type="text"
-                          required
-                          value={customerForm.city}
-                          onChange={e => setCustomerForm({ ...customerForm, city: e.target.value })}
-                          placeholder="مثلاً: فاس، الدار البيضاء، الرباط..."
-                          className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-3 text-sm focus:border-indigo-600 focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-black text-slate-700 mb-1">العنوان الكامل <span className="text-rose-600">*</span></label>
-                        <input
-                          type="text"
-                          required
-                          value={customerForm.address}
-                          onChange={e => setCustomerForm({ ...customerForm, address: e.target.value })}
-                          placeholder="الحي، الزنقة، رقم الدار أو الإقامة..."
-                          className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-3 text-sm focus:border-indigo-600 focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">البريد الإلكتروني (اختياري - ماشي ضروري)</label>
-                        <input
-                          type="email"
-                          value={customerForm.email}
-                          onChange={e => setCustomerForm({ ...customerForm, email: e.target.value })}
-                          placeholder="example@gmail.com (اختياري)"
-                          className="w-full bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm focus:border-indigo-600 focus:outline-none"
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        className="w-full py-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base shadow-lg transition-all"
-                      >
-                        🛒 اضغط هنا لتأكيد الطلب ({currentPage.price} درهم)
-                      </button>
-                    </form>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+  return (
+    <div className="min-h-screen bg-slate-900 text-white p-4 md:p-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-8 bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+          <div>
+            <h1 className="text-2xl font-black text-white">لوحة التحكم المركزية</h1>
+            <p className="text-slate-400 text-sm mt-1">المشرف العام</p>
+          </div>
+          <button onClick={logout} className="bg-rose-600 hover:bg-rose-700 px-4 py-2 rounded-xl text-sm font-semibold transition">تسجيل الخروج</button>
         </div>
-      );
-    }
 
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
-  </script>
-</body>
-</html>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-1 bg-slate-800 rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
+            <div className="p-6 border-b border-slate-700">
+              <h2 className="text-lg font-bold">الحسابات الفرعية</h2>
+            </div>
+            <div className="divide-y divide-slate-700">
+              {users.map(u => (
+                <div key={u.id} className={`p-4 cursor-pointer hover:bg-slate-700/50 transition flex justify-between items-center ${selectedUser?.id === u.id ? 'bg-indigo-600/20 border-r-4 border-indigo-500' : ''}`} onClick={() => setSelectedUser(u)}>
+                  <div>
+                    <p className="font-semibold">{u.name}</p>
+                    <p className="text-xs text-slate-400">{u.storeName}</p>
+                  </div>
+                  <button onClick={(e) => { e.stopPropagation(); deleteUser(u.id); }} className="text-rose-500 hover:text-rose-700 text-xs font-bold">حذف</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 bg-slate-800 rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
+            <div className="p-6 border-b border-slate-700 flex justify-between items-center">
+              <h2 className="text-lg font-bold">طلبيات {selectedUser ? selectedUser.storeName : '...')</h2>
+            </div>
+            {selectedUser ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-right border-collapse">
+                  <thead>
+                    <tr className="bg-slate-700/50 text-slate-400 text-sm border-b border-slate-700">
+                      <th className="p-4">الزبون</th>
+                      <th className="p-4">المنتج</th>
+                      <th className="p-4">الثمن</th>
+                      <th className="p-4">الحالة</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700 text-sm">
+                    {orders.map(o => (
+                      <tr key={o.id}>
+                        <td className="p-4 font-semibold">{o.clientName}</td>
+                        <td className="p-4">{o.productName}</td>
+                        <td className="p-4 font-bold text-emerald-400">{parseFloat(o.price).toFixed(2)} DH</td>
+                        <td className="p-4">
+                          <select value={o.status} onChange={(e) => updateOrderStatus(o.id, e.target.value)} className="bg-slate-900 border border-slate-700 rounded-lg px-2 py-1 text-xs font-bold text-indigo-400">
+                            <option value="قيد الانتظار">قيد الانتظار</option>
+                            <option value="مؤكد">مؤكد</option>
+                            <option value="تم التوصيل">تم التوصيل</option>
+                            <option value="ملغى">ملغى</option>
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="p-8 text-center text-slate-500">اختر حساباً فرعياً لعرض البيانات</p>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const UserDashboard = () => {
+  const { logout, user } = useAuth();
+  const [orders, setOrders] = useState([]);
+  const [userInfo, setUserInfo] = useState({ name: '', storeName: '' });
+
+  useEffect(() => {
+    if (user) {
+      const unsubUser = onSnapshot(doc(db, 'users', user.uid), (doc) => {
+        if (doc.exists()) setUserInfo(doc.data());
+      });
+      const q = query(collection(db, 'orders'), where('userId', '==', user.uid));
+      const unsubOrders = onSnapshot(q, (snapshot) => {
+        setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+      return () => { unsubUser(); unsubOrders(); };
+    }
+  }, [user]);
+
+  const addOrder = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    await addDoc(collection(db, 'orders'), {
+      userId: user.uid,
+      clientName: formData.get('clientName'),
+      productName: formData.get('productName'),
+      price: formData.get('price'),
+      status: 'قيد الانتظار',
+      createdAt: serverTimestamp()
+    });
+    e.target.reset();
+  };
+
+  const totalSales = orders.filter(o => o.status !== 'ملغى').reduce((acc, curr) => acc + parseFloat(curr.price), 0);
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-white p-4 md:p-8">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-8 bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+          <div>
+            <h1 className="text-2xl font-black text-white">لوحة تحكم {userInfo.storeName}</h1>
+            <p className="text-slate-400 text-sm mt-1">مرحباً، {userInfo.name}</p>
+          </div>
+          <button onClick={logout} className="bg-rose-600 hover:bg-rose-700 px-4 py-2 rounded-xl text-sm font-semibold transition">تسجيل الخروج</button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+            <p className="text-slate-400 text-sm font-semibold mb-2">إجمالي المبيعات (MAD)</p>
+            <div className="text-3xl font-bold text-emerald-400">{totalSales.toFixed(2)}</div>
+          </div>
+          <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+            <p className="text-slate-400 text-sm font-semibold mb-2">عدد الطلبات</p>
+            <div className="text-3xl font-bold text-indigo-400">{orders.length}</div>
+          </div>
+        </div>
+
+        <div className="bg-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700 mb-8">
+          <h2 className="text-lg font-bold mb-4">إضافة طلب جديد</h2>
+          <form onSubmit={addOrder} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <input type="text" name="clientName" placeholder="اسم الزبون" required className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" />
+            <input type="text" name="productName" placeholder="اسم المنتج" required className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" />
+            <input type="number" name="price" placeholder="الثمن (درهم)" step="0.01" min="0" required className="bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" />
+            <button type="submit" className="md:col-span-3 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl py-3 text-sm transition">+ إضافة الطلب</button>
+          </form>
+        </div>
+
+        <div className="bg-slate-800 rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
+          <div className="p-6 border-b border-slate-700">
+            <h2 className="text-lg font-bold">قائمة الطلبات</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right border-collapse">
+              <thead>
+                <tr className="bg-slate-700/50 text-slate-400 text-sm border-b border-slate-700">
+                  <th className="p-4">الزبون</th>
+                  <th className="p-4">المنتج</th>
+                  <th className="p-4">الثمن</th>
+                  <th className="p-4">الحالة</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-700 text-sm">
+                {orders.map(o => (
+                  <tr key={o.id}>
+                    <td className="p-4 font-semibold">{o.clientName}</td>
+                    <td className="p-4">{o.productName}</td>
+                    <td className="p-4 font-bold text-emerald-400">{parseFloat(o.price).toFixed(2)} DH</td>
+                    <td className="p-4">
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        o.status === 'تم التوصيل' ? 'bg-emerald-500/20 text-emerald-400' :
+                        o.status === 'مؤكد' ? 'bg-indigo-500/20 text-indigo-400' :
+                        o.status === 'ملغى' ? 'bg-rose-500/20 text-rose-400' :
+                        'bg-amber-500/20 text-amber-400'
+                      }`}>
+                        {o.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const Login = () => {
+  const { login } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await login(email, password);
+    } catch (err) {
+      setError('البريد الإلكتروني أو كلمة السر غير صحيحة.');
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl border border-slate-700 w-full max-w-md">
+        <h2 className="text-2xl font-black text-white mb-6 text-center">تسجيل الدخول إلى ALLIO</h2>
+        {error && <p className="bg-rose-500/20 text-rose-400 text-xs p-3 rounded-xl mb-4 font-bold text-center">{error}</p>}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="البريد الإلكتروني" required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500" />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="كلمة السر" required className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500" />
+          <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl py-3 transition">دخول</button>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <MainWrapper />
+    </AuthProvider>
+  );
+}
+
+function MainWrapper() {
+  const { user } = useAuth();
+  
+  if (!user) return <Login />;
+
+  const isAdmin = user.email === 'bb206073@gmail.com';
+  return isAdmin ? <AdminDashboard /> : <UserDashboard />;
+}
